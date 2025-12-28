@@ -1,0 +1,385 @@
+#!/usr/bin/env bun
+
+/**
+ * Google Calendar CLI Wrapper
+ *
+ * Purpose: Direct Google Calendar API access WITHOUT MCP context cost.
+ * Uses OAuth tokens from google-calendar-mcp for authentication.
+ *
+ * Context Savings: ~14.7k tokens per session (7.3% of context window)
+ *
+ * Usage:
+ *   calendar list-events --start DATE --end DATE
+ *   calendar create-event --title "Meeting" --start TIME --end TIME
+ *   calendar search-events --query "text" --start DATE --end DATE
+ *   calendar check-conflicts --start TIME --end TIME
+ *   calendar get-availability --date DATE
+ *   calendar list-calendars
+ *   calendar delete-event --event-id ID
+ */
+
+import { google } from 'googleapis';
+import { readFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
+
+const TOKENS_PATH = join(homedir(), '.config/google-calendar-mcp/tokens.json');
+const CREDENTIALS_PATH = '/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/credentials/credentials.json';
+
+interface TokenData {
+  normal?: {
+    access_token: string;
+    refresh_token: string;
+    scope: string;
+    token_type: string;
+    expiry_date: number;
+  };
+}
+
+async function getCalendarClient() {
+  try {
+    const credentials = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
+    const tokens: TokenData = JSON.parse(readFileSync(TOKENS_PATH, 'utf8'));
+
+    const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+
+    const oauth2Client = new google.auth.OAuth2(
+      client_id,
+      client_secret,
+      redirect_uris[0]
+    );
+
+    if (tokens.normal) {
+      oauth2Client.setCredentials(tokens.normal);
+    } else {
+      throw new Error('No authentication tokens found. Run: bunx --bun @cocal/google-calendar-mcp auth');
+    }
+
+    return google.calendar({ version: 'v3', auth: oauth2Client });
+  } catch (error: any) {
+    console.error(JSON.stringify({
+      success: false,
+      error: `Failed to initialize calendar client: ${error.message}`
+    }, null, 2));
+    process.exit(1);
+  }
+}
+
+function parseArgs(args: string[]): Record<string, string> {
+  const parsed: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+      const key = args[i].slice(2);
+      const value = args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : 'true';
+      parsed[key] = value;
+      if (value !== 'true') i++;
+    }
+  }
+  return parsed;
+}
+
+function formatDate(dateStr: string): string {
+  // Handle relative dates
+  const today = new Date();
+
+  if (dateStr === 'today') {
+    return today.toISOString().split('T')[0];
+  } else if (dateStr === 'tomorrow') {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  } else if (dateStr.startsWith('+')) {
+    const days = parseInt(dateStr.slice(1));
+    const future = new Date(today);
+    future.setDate(future.getDate() + days);
+    return future.toISOString().split('T')[0];
+  }
+
+  return dateStr;
+}
+
+async function listEvents(calendar: any, args: Record<string, string>) {
+  const timeMin = new Date(formatDate(args.start)).toISOString();
+  const timeMax = new Date(formatDate(args.end)).toISOString();
+
+  const response = await calendar.events.list({
+    calendarId: args.calendar || 'primary',
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: 'startTime',
+  });
+
+  return {
+    success: true,
+    events: response.data.items || [],
+    count: response.data.items?.length || 0
+  };
+}
+
+async function createEvent(calendar: any, args: Record<string, string>) {
+  const event = {
+    summary: args.title,
+    start: {
+      dateTime: new Date(args.start).toISOString(),
+      timeZone: args.timezone || 'America/Chicago',
+    },
+    end: {
+      dateTime: new Date(args.end).toISOString(),
+      timeZone: args.timezone || 'America/Chicago',
+    },
+    location: args.location,
+    description: args.description,
+  };
+
+  const response = await calendar.events.insert({
+    calendarId: args.calendar || 'primary',
+    resource: event,
+  });
+
+  return {
+    success: true,
+    event: response.data,
+    message: `Event created: ${response.data.summary}`
+  };
+}
+
+async function searchEvents(calendar: any, args: Record<string, string>) {
+  const timeMin = new Date(formatDate(args.start)).toISOString();
+  const timeMax = new Date(formatDate(args.end)).toISOString();
+
+  const response = await calendar.events.list({
+    calendarId: args.calendar || 'primary',
+    timeMin,
+    timeMax,
+    q: args.query,
+    singleEvents: true,
+  });
+
+  return {
+    success: true,
+    events: response.data.items || [],
+    count: response.data.items?.length || 0,
+    query: args.query
+  };
+}
+
+async function checkConflicts(calendar: any, args: Record<string, string>) {
+  const timeMin = new Date(args.start).toISOString();
+  const timeMax = new Date(args.end).toISOString();
+
+  const response = await calendar.events.list({
+    calendarId: args.calendar || 'primary',
+    timeMin,
+    timeMax,
+    singleEvents: true,
+  });
+
+  const conflicts = response.data.items || [];
+
+  return {
+    success: true,
+    hasConflicts: conflicts.length > 0,
+    conflicts: conflicts.map((e: any) => ({
+      summary: e.summary,
+      start: e.start.dateTime || e.start.date,
+      end: e.end.dateTime || e.end.date
+    }))
+  };
+}
+
+async function getAvailability(calendar: any, args: Record<string, string>) {
+  const date = formatDate(args.date);
+  const startOfDay = new Date(date);
+  startOfDay.setHours(8, 0, 0, 0); // 8am start
+  const endOfDay = new Date(date);
+  endOfDay.setHours(18, 0, 0, 0); // 6pm end
+
+  const response = await calendar.events.list({
+    calendarId: args.calendar || 'primary',
+    timeMin: startOfDay.toISOString(),
+    timeMax: endOfDay.toISOString(),
+    singleEvents: true,
+    orderBy: 'startTime',
+  });
+
+  const events = response.data.items || [];
+  const freeSlots = [];
+  let currentTime = startOfDay;
+
+  for (const event of events) {
+    const eventStart = new Date(event.start.dateTime || event.start.date);
+    if (currentTime < eventStart) {
+      freeSlots.push({
+        start: currentTime.toISOString(),
+        end: eventStart.toISOString()
+      });
+    }
+    currentTime = new Date(event.end.dateTime || event.end.date);
+  }
+
+  if (currentTime < endOfDay) {
+    freeSlots.push({
+      start: currentTime.toISOString(),
+      end: endOfDay.toISOString()
+    });
+  }
+
+  return {
+    success: true,
+    date,
+    freeSlots,
+    busySlots: events.length
+  };
+}
+
+async function listCalendars(calendar: any) {
+  const response = await calendar.calendarList.list();
+
+  return {
+    success: true,
+    calendars: response.data.items?.map((cal: any) => ({
+      id: cal.id,
+      summary: cal.summary,
+      timeZone: cal.timeZone,
+      accessRole: cal.accessRole,
+      primary: cal.primary || false
+    })) || []
+  };
+}
+
+async function updateEvent(calendar: any, args: Record<string, string>) {
+  const updates: any = {};
+
+  if (args.title) updates.summary = args.title;
+  if (args.start) {
+    updates.start = {
+      dateTime: new Date(args.start).toISOString(),
+      timeZone: args.timezone || 'America/Chicago',
+    };
+  }
+  if (args.end) {
+    updates.end = {
+      dateTime: new Date(args.end).toISOString(),
+      timeZone: args.timezone || 'America/Chicago',
+    };
+  }
+  if (args.location) updates.location = args.location;
+  if (args.description) updates.description = args.description;
+
+  const response = await calendar.events.patch({
+    calendarId: args.calendar || 'primary',
+    eventId: args['event-id'],
+    resource: updates,
+  });
+
+  return {
+    success: true,
+    event: response.data,
+    message: `Event updated: ${response.data.summary}`
+  };
+}
+
+async function deleteEvent(calendar: any, args: Record<string, string>) {
+  await calendar.events.delete({
+    calendarId: args.calendar || 'primary',
+    eventId: args['event-id'],
+  });
+
+  return {
+    success: true,
+    message: `Event ${args['event-id']} deleted`
+  };
+}
+
+async function main() {
+  const [command, ...rawArgs] = process.argv.slice(2);
+  const args = parseArgs(rawArgs);
+
+  if (!command) {
+    console.error('Usage: calendar <command> [options]');
+    console.error('Commands: list-events, create-event, search-events, check-conflicts, get-availability, list-calendars, delete-event');
+    process.exit(1);
+  }
+
+  try {
+    const calendar = await getCalendarClient();
+    let result;
+
+    switch (command) {
+      case 'list-events':
+        if (!args.start || !args.end) {
+          console.error('Error: --start and --end are required');
+          process.exit(1);
+        }
+        result = await listEvents(calendar, args);
+        break;
+
+      case 'create-event':
+        if (!args.title || !args.start || !args.end) {
+          console.error('Error: --title, --start, and --end are required');
+          process.exit(1);
+        }
+        result = await createEvent(calendar, args);
+        break;
+
+      case 'search-events':
+        if (!args.query || !args.start || !args.end) {
+          console.error('Error: --query, --start, and --end are required');
+          process.exit(1);
+        }
+        result = await searchEvents(calendar, args);
+        break;
+
+      case 'check-conflicts':
+        if (!args.start || !args.end) {
+          console.error('Error: --start and --end are required');
+          process.exit(1);
+        }
+        result = await checkConflicts(calendar, args);
+        break;
+
+      case 'get-availability':
+        if (!args.date) {
+          console.error('Error: --date is required');
+          process.exit(1);
+        }
+        result = await getAvailability(calendar, args);
+        break;
+
+      case 'list-calendars':
+        result = await listCalendars(calendar);
+        break;
+
+      case 'update-event':
+        if (!args['event-id']) {
+          console.error('Error: --event-id is required');
+          process.exit(1);
+        }
+        result = await updateEvent(calendar, args);
+        break;
+
+      case 'delete-event':
+        if (!args['event-id']) {
+          console.error('Error: --event-id is required');
+          process.exit(1);
+        }
+        result = await deleteEvent(calendar, args);
+        break;
+
+      default:
+        console.error(`Unknown command: ${command}`);
+        process.exit(1);
+    }
+
+    console.log(JSON.stringify(result, null, 2));
+  } catch (error: any) {
+    console.error(JSON.stringify({
+      success: false,
+      error: error.message
+    }, null, 2));
+    process.exit(1);
+  }
+}
+
+main();
