@@ -1,0 +1,16 @@
+
+# Runtime artifacts and cache files
+debug/
+plugins/
+config/
+statsig/
+file-history/
+shell-snapshots/
+todos/
+agent-sessions.json
+history.jsonl
+stats-cache.json
+
+# Bun lock files in subdirectories (generated)
+Skills/Observability/apps/client/bun.lock
+Skills/Observability/apps/server/bun.lock
