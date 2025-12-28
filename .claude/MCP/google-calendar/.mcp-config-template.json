@@ -1,0 +1,138 @@
+{
+  "_comment": "Copy this configuration block into /Users/donjacobsmeyer/PAI/.claude/.mcp.json under the 'mcpServers' key",
+  "_options": {
+    "option1_direct_bun": {
+      "name": "Direct Bun Execution (Recommended for PAI)",
+      "pros": [
+        "No orphaned processes",
+        "Fast startup with Bun",
+        "Claude Code manages lifecycle",
+        "Native PAI stack integration"
+      ],
+      "cons": [
+        "New process per session"
+      ],
+      "config": {
+        "google-calendar": {
+          "command": "bunx",
+          "args": [
+            "--bun",
+            "@cocal/google-calendar-mcp"
+          ],
+          "env": {
+            "GOOGLE_OAUTH_CREDENTIALS": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/credentials/credentials.json",
+            "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/tokens"
+          },
+          "description": "Google Calendar management with event creation, search, and scheduling"
+        }
+      }
+    },
+    "option2_docker_ephemeral": {
+      "name": "Docker Ephemeral (Process Isolation)",
+      "pros": [
+        "Complete isolation",
+        "Claude Code manages lifecycle",
+        "Clean startup/shutdown",
+        "Resource limits enforced"
+      ],
+      "cons": [
+        "Slower startup (container boot)",
+        "Higher resource usage"
+      ],
+      "config": {
+        "google-calendar": {
+          "command": "docker",
+          "args": [
+            "compose",
+            "-f",
+            "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/docker/docker-compose.yml",
+            "run",
+            "--rm",
+            "google-calendar-mcp"
+          ],
+          "description": "Google Calendar management (containerized)"
+        }
+      }
+    },
+    "option3_docker_persistent": {
+      "name": "Docker Persistent Service (Best Performance)",
+      "pros": [
+        "Fast connection (no boot time)",
+        "Single container instance",
+        "Lower resource usage",
+        "Persistent token caching"
+      ],
+      "cons": [
+        "Requires manual container start",
+        "Need to manage container lifecycle"
+      ],
+      "setup": "docker compose -f /Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/docker/docker-compose.yml up -d",
+      "config": {
+        "google-calendar": {
+          "command": "docker",
+          "args": [
+            "exec",
+            "-i",
+            "gcal-mcp",
+            "bunx",
+            "--bun",
+            "@cocal/google-calendar-mcp",
+            "start"
+          ],
+          "description": "Google Calendar management (containerized service)"
+        }
+      }
+    },
+    "option4_multi_account": {
+      "name": "Multi-Account Setup (Work + Personal)",
+      "pros": [
+        "Separate calendars for different accounts",
+        "Isolated authentication per account",
+        "Flexible account switching"
+      ],
+      "cons": [
+        "Requires separate auth flows",
+        "More complex configuration"
+      ],
+      "config": {
+        "google-calendar-work": {
+          "command": "bunx",
+          "args": [
+            "--bun",
+            "@cocal/google-calendar-mcp",
+            "start",
+            "work"
+          ],
+          "env": {
+            "GOOGLE_OAUTH_CREDENTIALS": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/credentials/credentials-work.json",
+            "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/tokens"
+          },
+          "description": "Work calendar management"
+        },
+        "google-calendar-personal": {
+          "command": "bunx",
+          "args": [
+            "--bun",
+            "@cocal/google-calendar-mcp",
+            "start",
+            "personal"
+          ],
+          "env": {
+            "GOOGLE_OAUTH_CREDENTIALS": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/credentials/credentials-personal.json",
+            "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/Users/donjacobsmeyer/PAI/.claude/MCP/google-calendar/tokens"
+          },
+          "description": "Personal calendar management"
+        }
+      }
+    }
+  },
+  "_recommended": "option1_direct_bun",
+  "_instructions": [
+    "1. Choose your preferred option above",
+    "2. Copy the 'config' section into /Users/donjacobsmeyer/PAI/.claude/.mcp.json under 'mcpServers'",
+    "3. Update paths if your PAI directory is different",
+    "4. Ensure credentials.json is in place",
+    "5. Run authentication flow",
+    "6. Restart Claude Code"
+  ]
+}

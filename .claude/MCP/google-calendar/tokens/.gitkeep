@@ -1,0 +1,2 @@
+# This file ensures the tokens directory is tracked in git
+# while .gitignore prevents token files from being committed

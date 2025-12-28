@@ -1,0 +1,1 @@
+{"timestamp":"2025-12-28T22:24:03.277Z","type":"attack_blocked","category":"catastrophic_deletion","pattern":"\\s+~\\/?(\\s*$|\\s+)","command":"find ~ -maxdepth 3 -name \".google*\" -o -name \"*calendar-token*\" 2>/dev/null | head -10","session_id":"598c1520-7432-47bc-93d3-336751055755"}

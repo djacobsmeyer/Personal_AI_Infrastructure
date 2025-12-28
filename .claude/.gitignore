@@ -14,3 +14,6 @@ stats-cache.json
 # Bun lock files in subdirectories (generated)
 Skills/Observability/apps/client/bun.lock
 Skills/Observability/apps/server/bun.lock
+
+# Raw event outputs may contain sensitive data
+History/Raw-Outputs/

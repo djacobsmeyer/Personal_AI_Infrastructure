@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  google-calendar-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: gcal-mcp
+    image: gcal-mcp:latest
+
+    # Restart policy for reliability
+    restart: unless-stopped
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+    # Volume mounts for credentials and tokens
+    volumes:
+      - ../credentials:/app/credentials:ro  # Read-only credentials
+      - ../tokens:/app/tokens:rw            # Read-write for token refresh
+
+    # Environment variables
+    environment:
+      - GOOGLE_OAUTH_CREDENTIALS=/app/credentials/credentials.json
+      - GOOGLE_CALENDAR_MCP_TOKEN_PATH=/app/tokens
+      - NODE_ENV=production
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Need write access to /tmp for token operations
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "bunx", "--bun", "@cocal/google-calendar-mcp", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+    # Network mode: none (MCP uses stdio, not network)
+    # Note: For OAuth auth, temporarily use 'bridge' mode
+    network_mode: bridge
+
+    # Labels for management
+    labels:
+      - "com.pai.service=mcp-server"
+      - "com.pai.mcp.type=google-calendar"
+      - "com.pai.runtime=bun"
+
+# Volumes for persistence
+volumes:
+  credentials:
+    driver: local
+  tokens:
+    driver: local
+
+networks:
+  default:
+    name: mcp-network
+    driver: bridge
