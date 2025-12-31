@@ -1,10 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "PAI_DIR": "/Users/donjacobsmeyer/.claude",
-    "DA": "PAI",
+    "PAI_DIR": "/Users/donjacobsmeyer/.config/pai",
+    "DA": "Mako",
     "PAI_SIMPLE_COLORS": "0",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000",
+    "TIME_ZONE": "America/Chicago"
   },
   "permissions": {
     "allow": [
@@ -59,129 +60,65 @@
       "Bash(> /dev/sda)"
     ]
   },
+  "model": "sonnet",
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [],
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ~/.config/pai/hooks/initialize-session.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun run ~/.config/pai/hooks/load-core-context.ts"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "${PAI_DIR}/Hooks/security-validator.ts"
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type PreToolUse"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type PostToolUse"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/update-tab-on-action.ts"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-session-summary.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type SessionEnd"
+            "command": "bun run ~/.config/pai/hooks/security-validator.ts"
           }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "${PAI_DIR}/Hooks/update-tab-titles.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type UserPromptSubmit"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/load-core-context.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/initialize-session.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type SessionStart"
+            "command": "bun run ~/.config/pai/hooks/update-tab-titles.ts"
           }
         ]
       }
     ],
     "Stop": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "${PAI_DIR}/Hooks/stop-hook.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type Stop"
+            "command": "bun run ~/.config/pai/hooks/stop-hook-voice.ts"
           }
         ]
       }
     ],
     "SubagentStop": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "${PAI_DIR}/Hooks/subagent-stop-hook.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type SubagentStop"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/context-compression-hook.ts"
-          },
-          {
-            "type": "command",
-            "command": "${PAI_DIR}/Hooks/capture-all-events.ts --event-type PreCompact"
+            "command": "bun run ~/.config/pai/hooks/subagent-stop-hook-voice.ts"
           }
         ]
       }
@@ -189,7 +126,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash ${PAI_DIR}/statusline-command.sh"
+    "command": "input=$(cat); cwd=$(echo \"$input\" | jq -r '.workspace.current_dir'); model=$(echo \"$input\" | jq -r '.model.display_name'); style=$(echo \"$input\" | jq -r '.output_style.name // \"default\"'); transcript=$(echo \"$input\" | jq -r '.transcript_path'); dir=$(basename \"$cwd\"); git_info=\"\"; if git -C \"$cwd\" rev-parse --git-dir >/dev/null 2>&1; then branch=$(git -C \"$cwd\" --no-optional-locks branch --show-current 2>/dev/null); if [ -n \"$branch\" ]; then if ! git -C \"$cwd\" --no-optional-locks diff-index --quiet HEAD -- 2>/dev/null; then git_info=\" (git:$branch*)\"; else git_info=\" (git:$branch)\"; fi; fi; fi; ctx=\"\"; usage=$(echo \"$input\" | jq '.context_window.current_usage'); if [ \"$usage\" != \"null\" ]; then current=$(echo \"$usage\" | jq '.input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens'); size=$(echo \"$input\" | jq '.context_window.context_window_size'); if [ \"$current\" != \"null\" ] && [ \"$size\" != \"null\" ] && [ \"$size\" -gt 0 ]; then pct=$((current * 100 / size)); ctx=\" [$pct%%]\"; fi; fi; agent=\"\"; if [ -f \"$transcript\" ]; then task=$(tail -n 30 \"$transcript\" 2>/dev/null | grep -oE '\"(agent|skill|subagent)\"[[:space:]]*:[[:space:]]*\"[^\"]{1,30}' | tail -n 1 | sed 's/.*: *\"//' | sed 's/\"$//'); if [ -n \"$task\" ]; then agent=\" {$task}\"; fi; fi; printf \"%s%s | %s\" \"$dir\" \"$git_info\" \"$model\"; if [ \"$style\" != \"default\" ]; then printf \" [%s]\" \"$style\"; fi; printf \"%s%s\" \"$ctx\" \"$agent\""
   },
   "enabledPlugins": {
     "browser-automation@browser-tools": true
@@ -203,6 +140,5 @@
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "Maximum tokens for Claude responses. Higher values allow longer outputs but cost more."
   },
   "_setupNote": "IMPORTANT: Run 'bash .claude/setup.sh' to automatically configure PAI_DIR. If you see hook errors mentioning '__HOME__', the setup script was not run or you need to manually change PAI_DIR below to your actual home directory path (e.g., /Users/john/.claude on macOS or /home/john/.claude on Linux).",
-  "max_tokens": 4096,
-  "model": "sonnet"
+  "max_tokens": 4096
 }
