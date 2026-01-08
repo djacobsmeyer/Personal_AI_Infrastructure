@@ -49,7 +49,37 @@ If you need to look something up, figure something out, or fill in gaps - the pa
 
 ## Pack Types
 
-### Feature Packs
+PAI has two fundamentally different pack types. Understanding this distinction is critical.
+
+### Skill Packs (🎯)
+
+**AI-invoked capabilities** that Claude routes to via SKILL.md:
+
+| Requirement | Description |
+|-------------|-------------|
+| SKILL.md | **Required** - defines triggers and routing |
+| Workflows/ | Contains workflow definitions |
+| Validation | All workflow refs must resolve |
+
+Skill packs are invoked BY the AI when it detects relevant triggers.
+
+### System Packs (⚙️)
+
+**Human-installed infrastructure** that runs in the background:
+
+| Requirement | Description |
+|-------------|-------------|
+| SKILL.md | **Not required** - these are infrastructure |
+| src/ | Contains hooks, servers, configs |
+| Validation | Must install and run correctly |
+
+System packs are installed BY humans and provide infrastructure. They are NOT incomplete for lacking SKILL.md - that's by design.
+
+**System packs:** pai-hook-system, pai-history-system, pai-voice-system, pai-observability-server
+
+---
+
+### Feature Packs (Legacy Term)
 
 **Architectural systems** that add infrastructure capabilities:
 
@@ -58,7 +88,7 @@ If you need to look something up, figure something out, or fill in gaps - the pa
 - Agent orchestration (multi-agent coordination)
 - Hook systems (event-driven automation)
 
-**Example:** The Kai History System pack adds automatic context-tracking with 4 hooks, 3 library files, and complete settings.json configuration.
+**Example:** The PAI History System pack adds automatic context-tracking with 4 hooks, 3 library files, and complete settings.json configuration.
 
 ### Skill Packs
 
@@ -225,23 +255,23 @@ Browse all packs: [Packs/](Packs/)
 
 | Pack | Type | Description |
 |------|------|-------------|
-| [kai-hook-system](Packs/kai-hook-system.md) | Foundation | Event-driven automation framework for hook-based capabilities |
-| [kai-history-system](Packs/kai-history-system.md) | Infrastructure | Automatic context-tracking for all work, decisions, and learnings |
-| [kai-core-install](Packs/kai-core-install.md) | Core | Skills + Identity + Architecture - complete foundation pack |
-| [kai-voice-system](Packs/kai-voice-system.md) | Notifications | Voice output with ElevenLabs TTS and prosody enhancement |
-| [kai-observability-server](Packs/kai-observability-server.md) | Observability | Real-time multi-agent monitoring dashboard |
+| [pai-hook-system](Packs/pai-hook-system.md) | Foundation | Event-driven automation framework for hook-based capabilities |
+| [pai-history-system](Packs/pai-history-system.md) | Infrastructure | Automatic context-tracking for all work, decisions, and learnings |
+| [pai-core-install](Packs/pai-core-install.md) | Core | Skills + Identity + Architecture - complete foundation pack |
+| [pai-voice-system](Packs/pai-voice-system.md) | Notifications | Voice output with ElevenLabs TTS and prosody enhancement |
+| [pai-observability-server](Packs/pai-observability-server.md) | Observability | Real-time multi-agent monitoring dashboard |
 
 ### Skill Packs
 
 | Pack | Type | Description |
 |------|------|-------------|
-| [kai-art-skill](Packs/kai-art-skill.md) | Skill | Visual content generation with charcoal architectural sketch aesthetic |
-| [kai-agents-skill](Packs/kai-agents-skill.md) | Skill | Dynamic agent composition with specialized personalities and voices |
-| [kai-prompting-skill](Packs/kai-prompting-skill.md) | Skill | Meta-prompting system for programmatic prompt generation |
+| [pai-art-skill](Packs/pai-art-skill.md) | Skill | Visual content generation with charcoal architectural sketch aesthetic |
+| [pai-agents-skill](Packs/pai-agents-skill.md) | Skill | Dynamic agent composition with specialized personalities and voices |
+| [pai-prompting-skill](Packs/pai-prompting-skill.md) | Skill | Meta-prompting system for programmatic prompt generation |
 
 **Installation order:** hooks → history → core-install → voice → observability (optional) → skill packs
 
-**Or install the complete [Kai Bundle](Bundles/Kai/)** which handles ordering automatically.
+**Or install the complete [PAI Bundle](Bundles/Official/)** which handles ordering automatically.
 
 ---
 
